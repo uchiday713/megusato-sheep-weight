@@ -68,6 +68,10 @@
   🎤 音声入力
 </button>
 
+<button id="soundTestButton">
+  🔊 音声テスト
+</button>
+  
 <div id="status">
   ボタンを押してください
 </div>
@@ -98,6 +102,26 @@ const parsed =
 
 const button =
   document.getElementById("startButton");
+
+const soundTestButton =
+  document.getElementById("soundTestButton");
+
+soundTestButton.addEventListener("click", function() {
+
+  speechSynthesis.cancel();
+
+  const utterance =
+    new SpeechSynthesisUtterance(
+      "音声テストです"
+    );
+
+  utterance.lang = "ja-JP";
+  utterance.volume = 1;
+  utterance.rate = 1;
+
+  speechSynthesis.speak(utterance);
+
+});
 
 
 let recognition;
