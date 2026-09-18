@@ -5,14 +5,15 @@
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0">
 
-  <title>羊 音声認識テスト</title>
+  <title>めぐさと羊 体重記録</title>
 
   <style>
     body {
       font-family: sans-serif;
       text-align: center;
-      padding: 40px 20px;
+      padding: 35px 20px;
       background: #f5f5ef;
+      color: #333;
     }
 
     h1 {
@@ -23,7 +24,7 @@
       width: 90%;
       max-width: 400px;
       padding: 22px;
-      margin: 30px 0;
+      margin: 25px 0;
       font-size: 24px;
       border: none;
       border-radius: 14px;
@@ -36,27 +37,43 @@
       margin: 20px;
     }
 
-    #result {
-      font-size: 26px;
-      font-weight: bold;
-      margin: 30px 10px;
+    #heard {
+      font-size: 18px;
+      margin: 20px 0;
+      color: #666;
+    }
+
+    #parsed {
+      max-width: 400px;
+      margin: 25px auto;
+      padding: 20px;
+      background: white;
+      border-radius: 14px;
+      font-size: 24px;
+      line-height: 1.8;
+    }
+
+    .error {
+      color: #b00020;
     }
   </style>
 </head>
 
 <body>
 
-  <h1>🐑 羊 音声認識テスト</h1>
+<h1>🐑 めぐさと羊 体重記録</h1>
 
-  <button id="startButton">
-    🎤 音声認識を開始
-  </button>
+<button id="startButton">
+  🎤 音声入力
+</button>
 
-  <div id="status">
-    ボタンを押してください
-  </div>
+<div id="status">
+  ボタンを押してください
+</div>
 
-  <div id="result"></div>
+<div id="heard"></div>
+
+<div id="parsed"></div>
 
 
 <script>
@@ -68,8 +85,11 @@ const SpeechRecognition =
 const status =
   document.getElementById("status");
 
-const result =
-  document.getElementById("result");
+const heard =
+  document.getElementById("heard");
+
+const parsed =
+  document.getElementById("parsed");
 
 const button =
   document.getElementById("startButton");
@@ -88,75 +108,125 @@ if (!SpeechRecognition) {
     new SpeechRecognition();
 
   recognition.lang = "ja-JP";
-
-  // まずは1回だけ認識する
   recognition.continuous = false;
-
   recognition.interimResults = false;
 
 
-  button.addEventListener(
-    "click",
-    function() {
+  button.addEventListener("click", function() {
 
-      result.textContent = "";
+    heard.textContent = "";
+    parsed.textContent = "";
 
-      status.textContent =
-        "音声認識を開始しています…";
+    status.textContent =
+      "音声認識を開始しています…";
 
-      recognition.start();
+    recognition.start();
 
-    }
-  );
+  });
 
 
-  recognition.onstart =
-    function() {
+  recognition.onstart = function() {
 
-      status.textContent =
-        "🎤 聞いています…";
+    status.textContent =
+      "🎤 聞いています…";
 
-    };
-
-
-  recognition.onresult =
-    function(event) {
-
-      const text =
-        event.results[0][0].transcript;
-
-      result.textContent =
-        "認識結果：" + text;
-
-      status.textContent =
-        "認識できました！";
-
-    };
+  };
 
 
-  recognition.onerror =
-    function(event) {
+  recognition.onresult = function(event) {
 
-      status.textContent =
-        "エラー：" + event.error;
+    const text =
+      event.results[0][0].transcript;
 
-    };
+    heard.textContent =
+      "認識：" + text;
+
+    parseWeight(text);
+
+  };
 
 
-  recognition.onend =
-    function() {
+  recognition.onerror = function(event) {
 
-      if (
-        !result.textContent &&
-        !status.textContent.startsWith("エラー")
-      ) {
+    status.textContent =
+      "エラー：" + event.error;
 
-        status.textContent =
-          "音声認識が終了しました";
+  };
 
-      }
+}
 
-    };
+
+// 認識された文章を
+// 「羊の名前」と「体重」に分ける
+function parseWeight(text) {
+
+  let normalized = text
+    .replace(/０/g, "0")
+    .replace(/１/g, "1")
+    .replace(/２/g, "2")
+    .replace(/３/g, "3")
+    .replace(/４/g, "4")
+    .replace(/５/g, "5")
+    .replace(/６/g, "6")
+    .replace(/７/g, "7")
+    .replace(/８/g, "8")
+    .replace(/９/g, "9")
+    .replace(/．/g, ".")
+    .replace(/点/g, ".");
+
+
+  const match =
+    normalized.match(
+      /^(.+?)[、,\s]*(\d+(?:\.\d+)?)\s*(?:キロ|kg|キログラム)/i
+    );
+
+
+  if (!match) {
+
+    status.textContent =
+      "うまく読み取れませんでした";
+
+    parsed.innerHTML =
+      '<span class="error">' +
+      '「名前、47.5キロ」のように話してください' +
+      '</span>';
+
+    return;
+  }
+
+
+  const name =
+    match[1].trim();
+
+  const weight =
+    Number(match[2]);
+
+
+  status.textContent =
+    "読み取れました！";
+
+
+  parsed.innerHTML =
+    "🐑 名前：<strong>" +
+    escapeHtml(name) +
+    "</strong><br>" +
+
+    "⚖️ 体重：<strong>" +
+    weight +
+    " kg</strong>";
+
+}
+
+
+// HTML表示用の安全処理
+function escapeHtml(text) {
+
+  const div =
+    document.createElement("div");
+
+  div.textContent = text;
+
+  return div.innerHTML;
 
 }
 
