@@ -33,14 +33,15 @@
     }
 
     #status {
-      font-size: 20px;
+      font-size: 21px;
       margin: 20px;
+      font-weight: bold;
     }
 
     #heard {
       font-size: 18px;
-      margin: 20px 0;
       color: #666;
+      margin: 20px 0;
     }
 
     #parsed {
@@ -49,7 +50,7 @@
       padding: 20px;
       background: white;
       border-radius: 14px;
-      font-size: 24px;
+      font-size: 23px;
       line-height: 1.8;
     }
 
@@ -72,11 +73,15 @@
 </div>
 
 <div id="heard"></div>
-
 <div id="parsed"></div>
 
 
 <script>
+
+// ★ここだけ自分のURLに変更
+const API_URL =
+  "https://script.google.com/macros/s/AKfycbzSuD_O2Pny7pmCAMq2ENK_v_KYv4Wn42sOsqLQNhI6TMoWEkVBggiJW9JBBIiw6AWc/exec";
+
 
 const SpeechRecognition =
   window.SpeechRecognition ||
@@ -95,6 +100,9 @@ const button =
   document.getElementById("startButton");
 
 
+let recognition;
+
+
 if (!SpeechRecognition) {
 
   status.textContent =
@@ -104,7 +112,7 @@ if (!SpeechRecognition) {
 
 } else {
 
-  const recognition =
+  recognition =
     new SpeechRecognition();
 
   recognition.lang = "ja-JP";
@@ -152,12 +160,10 @@ if (!SpeechRecognition) {
       "エラー：" + event.error;
 
   };
-
 }
 
 
-// 認識された文章を
-// 「羊の名前」と「体重」に分ける
+// 音声を名前＋体重に分ける
 function parseWeight(text) {
 
   let normalized = text
@@ -202,29 +208,147 @@ function parseWeight(text) {
     Number(match[2]);
 
 
-  status.textContent =
-    "読み取れました！";
-
-
   parsed.innerHTML =
     "🐑 名前：<strong>" +
     escapeHtml(name) +
     "</strong><br>" +
-
     "⚖️ 体重：<strong>" +
     weight +
     " kg</strong>";
 
+
+  // Google Sheetへ送信
+  registerWeight(name, weight);
 }
 
 
-// HTML表示用の安全処理
+// Apps Scriptへ送る
+function registerWeight(name, weight) {
+
+  status.textContent =
+    "Google Sheetへ登録しています…";
+
+
+  const callbackName =
+    "sheepCallback_" + Date.now();
+
+
+  window[callbackName] =
+    function(result) {
+
+      if (result.success) {
+
+        status.textContent =
+          "✅ 登録しました";
+
+        speakResult(result);
+
+      } else {
+
+        status.textContent =
+          "登録エラー：" + result.error;
+
+      }
+
+
+      delete window[callbackName];
+
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+
+
+  const script =
+    document.createElement("script");
+
+
+  script.src =
+    API_URL +
+    "?action=register" +
+    "&name=" +
+    encodeURIComponent(name) +
+    "&weight=" +
+    encodeURIComponent(weight) +
+    "&callback=" +
+    encodeURIComponent(callbackName);
+
+
+  script.onerror =
+    function() {
+
+      status.textContent =
+        "通信エラーが発生しました";
+
+      delete window[callbackName];
+
+    };
+
+
+  document.body.appendChild(script);
+}
+
+
+// 登録結果を読み上げる
+function speakResult(result) {
+
+  let message =
+    result.name +
+    "、" +
+    result.weight +
+    "キロ、登録しました。";
+
+
+  if (
+    result.previousWeight !== null &&
+    result.previousWeight !== undefined
+  ) {
+
+    const diff =
+      result.difference;
+
+
+    if (diff > 0) {
+
+      message +=
+        "前回より" +
+        diff +
+        "キロ増えています。";
+
+    } else if (diff < 0) {
+
+      message +=
+        "前回より" +
+        Math.abs(diff) +
+        "キロ減っています。";
+
+    } else {
+
+      message +=
+        "前回と同じです。";
+
+    }
+
+  }
+
+
+  const utterance =
+    new SpeechSynthesisUtterance(message);
+
+  utterance.lang =
+    "ja-JP";
+
+  speechSynthesis.speak(utterance);
+}
+
+
 function escapeHtml(text) {
 
   const div =
     document.createElement("div");
 
-  div.textContent = text;
+  div.textContent =
+    text;
 
   return div.innerHTML;
 
