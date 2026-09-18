@@ -352,19 +352,28 @@ function speakResult(result) {
         "前回と同じです。";
 
     }
-
   }
 
 
-  const utterance =
-    new SpeechSynthesisUtterance(message);
+  // 残っている読み上げを一度リセット
+  speechSynthesis.cancel();
 
-  utterance.lang =
-    "ja-JP";
 
-  speechSynthesis.speak(utterance);
+  // 少し待ってから読み上げる
+  setTimeout(function() {
+
+    const utterance =
+      new SpeechSynthesisUtterance(message);
+
+    utterance.lang = "ja-JP";
+    utterance.volume = 1;
+    utterance.rate = 1;
+
+    speechSynthesis.speak(utterance);
+
+  }, 300);
+
 }
-
 
 function escapeHtml(text) {
 
