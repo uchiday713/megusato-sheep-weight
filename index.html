@@ -6,39 +6,62 @@
 
 <title>めぐさと羊 体重記録</title>
 
+<!-- グラフ表示用 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 body {
   font-family: sans-serif;
   text-align: center;
-  padding: 30px 20px;
+  padding: 25px 15px;
   background: #f5f5ef;
   color: #333;
 }
 
-h1 { font-size: 26px; }
+h1 {
+  font-size: 26px;
+}
 
 button {
   width: 90%;
   max-width: 400px;
-  padding: 20px;
-  margin: 10px;
-  font-size: 22px;
+  padding: 18px;
+  margin: 8px;
+  font-size: 20px;
   border: none;
   border-radius: 14px;
   color: white;
 }
 
-#startButton { background: #49764b; }
-#stopButton { background: #8b4545; }
+#startButton {
+  background: #49764b;
+}
+
+#stopButton {
+  background: #8b4545;
+}
+
+#graphButton {
+  background: #416b91;
+  margin-top: 25px;
+}
+
+#showGraphButton {
+  background: #49764b;
+}
+
+#closeGraphButton {
+  background: #777;
+}
 
 #status {
-  font-size: 22px;
+  font-size: 21px;
   font-weight: bold;
-  margin: 25px 0;
+  margin: 20px 0;
 }
 
 #heard {
-  font-size: 17px;
+  font-size: 16px;
   color: #666;
   margin: 15px;
 }
@@ -46,11 +69,41 @@ button {
 #parsed {
   max-width: 400px;
   margin: 20px auto;
+  padding: 18px;
+  background: white;
+  border-radius: 14px;
+  font-size: 21px;
+  line-height: 1.7;
+}
+
+#graphArea {
+  display: none;
+  max-width: 700px;
+  margin: 25px auto;
   padding: 20px;
   background: white;
   border-radius: 14px;
-  font-size: 22px;
-  line-height: 1.7;
+}
+
+select {
+  width: 90%;
+  max-width: 350px;
+  padding: 14px;
+  margin: 10px;
+  font-size: 20px;
+  border-radius: 10px;
+}
+
+#graphInfo {
+  font-size: 18px;
+  margin: 15px;
+  font-weight: bold;
+}
+
+.chartBox {
+  position: relative;
+  width: 100%;
+  min-height: 320px;
 }
 </style>
 </head>
@@ -74,17 +127,58 @@ button {
 <div id="heard"></div>
 <div id="parsed"></div>
 
+<button id="graphButton">
+📈 体重推移を見る
+</button>
+
+
+<!-- グラフ画面 -->
+<div id="graphArea">
+
+  <h2>📈 体重推移</h2>
+
+  <select id="sheepSelect">
+    <option value="">
+      羊を選んでください
+    </option>
+  </select>
+
+  <br>
+
+  <button id="showGraphButton">
+    グラフを表示
+  </button>
+
+  <div id="graphInfo"></div>
+
+  <div class="chartBox">
+    <canvas id="weightChart"></canvas>
+  </div>
+
+  <button id="closeGraphButton">
+    閉じる
+  </button>
+
+</div>
+
+
 <script>
 
-// ★ここを自分のApps Script URLに変更
+// ★★★★★★★★★★★★★★★★★★★★★
+// ここだけ自分のApps Script URLに変更
+// ★★★★★★★★★★★★★★★★★★★★★
+
 const API_URL =
   "https://script.google.com/macros/s/AKfycbzSuD_O2Pny7pmCAMq2ENK_v_KYv4Wn42sOsqLQNhI6TMoWEkVBggiJW9JBBIiw6AWc/exec";
 
+
 const WAKE_WORD = "羊体重";
+
 
 const SpeechRecognition =
   window.SpeechRecognition ||
   window.webkitSpeechRecognition;
+
 
 const status =
   document.getElementById("status");
@@ -101,10 +195,35 @@ const startButton =
 const stopButton =
   document.getElementById("stopButton");
 
+const graphButton =
+  document.getElementById("graphButton");
+
+const graphArea =
+  document.getElementById("graphArea");
+
+const sheepSelect =
+  document.getElementById("sheepSelect");
+
+const showGraphButton =
+  document.getElementById("showGraphButton");
+
+const closeGraphButton =
+  document.getElementById("closeGraphButton");
+
+const graphInfo =
+  document.getElementById("graphInfo");
+
+
 let recognition;
 let running = false;
 let restarting = false;
+let weightChart = null;
 
+
+
+// ======================================
+// 音声認識
+// ======================================
 
 if (!SpeechRecognition) {
 
@@ -118,64 +237,79 @@ if (!SpeechRecognition) {
   recognition =
     new SpeechRecognition();
 
-  recognition.lang = "ja-JP";
-  recognition.continuous = false;
-  recognition.interimResults = false;
+  recognition.lang =
+    "ja-JP";
+
+  recognition.continuous =
+    false;
+
+  recognition.interimResults =
+    false;
 
 
-  // 認識結果
-  recognition.onresult = function(event) {
+  recognition.onresult =
+    function(event) {
 
-    const text =
-      event.results[0][0].transcript.trim();
+      const text =
+        event.results[0][0]
+          .transcript
+          .trim();
 
-    heard.textContent =
-      "認識：" + text;
+      heard.textContent =
+        "認識：" + text;
 
-    processSpeech(text);
-  };
-
-
-  recognition.onerror = function(event) {
-
-    console.log(
-      "Speech error:",
-      event.error
-    );
-
-    if (
-      event.error === "not-allowed" ||
-      event.error === "service-not-allowed"
-    ) {
-
-      running = false;
-
-      status.textContent =
-        "マイクを利用できません";
-
-      return;
-    }
-
-    if (running) {
-      restartListening(700);
-    }
-  };
+      processSpeech(text);
+    };
 
 
-  recognition.onend = function() {
+  recognition.onerror =
+    function(event) {
 
-    // processSpeech側で登録処理中の場合は
-    // そこで再開するので何もしない
-  };
+      console.log(
+        "Speech error:",
+        event.error
+      );
+
+
+      if (
+        event.error === "not-allowed" ||
+        event.error ===
+          "service-not-allowed"
+      ) {
+
+        running = false;
+
+        status.textContent =
+          "マイクを利用できません";
+
+        return;
+      }
+
+
+      if (running) {
+
+        restartListening(700);
+      }
+    };
 }
 
 
+
+// ======================================
 // 連続測定開始
+// ======================================
+
 startButton.addEventListener(
   "click",
   function() {
 
     if (running) return;
+
+
+    // グラフを閉じる
+    graphArea.style.display =
+      "none";
+
 
     running = true;
 
@@ -185,57 +319,86 @@ startButton.addEventListener(
     status.textContent =
       "開始します…";
 
-    // iPhone Safariの音声を有効化
+
     speechSynthesis.cancel();
+
 
     const unlock =
       new SpeechSynthesisUtterance(
         "開始します"
       );
 
-    unlock.lang = "ja-JP";
-    unlock.rate = 0.9;
 
-    unlock.onend = function() {
+    unlock.lang =
+      "ja-JP";
 
-      if (running) {
-        startListening();
-      }
-    };
+    unlock.rate =
+      0.9;
 
-    speechSynthesis.speak(unlock);
+
+    unlock.onend =
+      function() {
+
+        if (running) {
+
+          startListening();
+        }
+      };
+
+
+    speechSynthesis.speak(
+      unlock
+    );
   }
 );
 
 
+
+// ======================================
 // 測定終了
+// ======================================
+
 stopButton.addEventListener(
   "click",
-  function() {
-
-    running = false;
-
-    speechSynthesis.cancel();
-
-    try {
-      recognition.abort();
-    } catch (e) {}
-
-    status.textContent =
-      "測定を終了しました";
-
-    heard.textContent = "";
-  }
+  stopMeasurement
 );
 
 
+function stopMeasurement() {
+
+  running = false;
+
+  speechSynthesis.cancel();
+
+
+  if (recognition) {
+
+    try {
+
+      recognition.abort();
+
+    } catch (e) {}
+  }
+
+
+  status.textContent =
+    "測定を終了しました";
+}
+
+
+
+// ======================================
 // 聞き取り開始
+// ======================================
+
 function startListening() {
 
   if (!running) return;
 
+
   status.textContent =
     "🎤 「羊体重」と呼びかけてください";
+
 
   try {
 
@@ -244,31 +407,48 @@ function startListening() {
   } catch (e) {
 
     restartListening(700);
-
   }
 }
 
 
-// 少し待って再開
+
 function restartListening(delay) {
 
-  if (!running || restarting) return;
+  if (
+    !running ||
+    restarting
+  ) {
+
+    return;
+  }
+
 
   restarting = true;
 
-  setTimeout(function() {
 
-    restarting = false;
+  setTimeout(
+    function() {
 
-    if (running) {
-      startListening();
-    }
+      restarting =
+        false;
 
-  }, delay);
+
+      if (running) {
+
+        startListening();
+      }
+
+    },
+    delay
+  );
 }
 
 
+
+// ======================================
 // 認識内容を処理
+// ======================================
+
 function processSpeech(text) {
 
   if (!running) return;
@@ -278,8 +458,12 @@ function processSpeech(text) {
     normalizeText(text);
 
 
-  // 「めぐさと」で始まらなければ無視
-  if (!normalized.startsWith(WAKE_WORD)) {
+  // 「羊体重」で始まらなければ無視
+  if (
+    !normalized.startsWith(
+      WAKE_WORD
+    )
+  ) {
 
     status.textContent =
       "待機中…";
@@ -290,14 +474,17 @@ function processSpeech(text) {
   }
 
 
-  // 最初の「めぐさと」を削除
   normalized =
     normalized
-      .slice(WAKE_WORD.length)
-      .replace(/^[、,\s]+/, "");
+      .slice(
+        WAKE_WORD.length
+      )
+      .replace(
+        /^[、,\s]+/,
+        ""
+      );
 
 
-  // 名前＋体重を取得
   const match =
     normalized.match(
       /^(.+?)[、,\s]*(\d+(?:\.\d+)?)\s*(?:キロ|kg|キログラム)/i
@@ -331,11 +518,18 @@ function processSpeech(text) {
     " kg</strong>";
 
 
-  registerWeight(name, weight);
+  registerWeight(
+    name,
+    weight
+  );
 }
 
 
-// 数字などを整える
+
+// ======================================
+// 文字の整理
+// ======================================
+
 function normalizeText(text) {
 
   return text
@@ -355,31 +549,34 @@ function normalizeText(text) {
 }
 
 
-// Google Sheetへ登録
-function registerWeight(name, weight) {
+
+// ======================================
+// 体重登録
+// ======================================
+
+function registerWeight(
+  name,
+  weight
+) {
 
   status.textContent =
     "登録しています…";
 
 
-  const callbackName =
-    "sheepCallback_" + Date.now();
+  jsonpRequest(
+    {
+      action: "register",
+      name: name,
+      weight: weight
+    },
 
-
-  window[callbackName] =
     function(result) {
-
-      delete window[callbackName];
-
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-
 
       if (!result.success) {
 
         status.textContent =
-          "登録エラー：" + result.error;
+          "登録エラー：" +
+          result.error;
 
         restartListening(1000);
 
@@ -391,41 +588,16 @@ function registerWeight(name, weight) {
         "✅ 登録しました";
 
       speakResult(result);
-    };
-
-
-  const script =
-    document.createElement("script");
-
-
-  script.src =
-    API_URL +
-    "?action=register" +
-    "&name=" +
-    encodeURIComponent(name) +
-    "&weight=" +
-    encodeURIComponent(weight) +
-    "&callback=" +
-    encodeURIComponent(callbackName);
-
-
-  script.onerror =
-    function() {
-
-      status.textContent =
-        "通信エラーが発生しました";
-
-      delete window[callbackName];
-
-      restartListening(1000);
-    };
-
-
-  document.body.appendChild(script);
+    }
+  );
 }
 
 
-// 登録結果を復唱
+
+// ======================================
+// 登録結果を読み上げ
+// ======================================
+
 function speakResult(result) {
 
   let message =
@@ -469,44 +641,546 @@ function speakResult(result) {
   speechSynthesis.cancel();
 
 
-  setTimeout(function() {
+  setTimeout(
+    function() {
 
-    const utterance =
-      new SpeechSynthesisUtterance(
-        message
+      const utterance =
+        new SpeechSynthesisUtterance(
+          message
+        );
+
+
+      utterance.lang =
+        "ja-JP";
+
+      utterance.rate =
+        1;
+
+
+      utterance.onend =
+        function() {
+
+          if (running) {
+
+            status.textContent =
+              "次の羊を待っています…";
+
+            restartListening(500);
+          }
+        };
+
+
+      speechSynthesis.speak(
+        utterance
       );
 
-    utterance.lang = "ja-JP";
-    utterance.rate = 1;
+    },
+    300
+  );
+}
 
 
-    // 復唱が終わったら次の羊へ
-    utterance.onend = function() {
 
-      if (running) {
+// ======================================
+// グラフボタン
+// ======================================
 
-        status.textContent =
-          "次の羊を待っています…";
+graphButton.addEventListener(
+  "click",
+  function() {
 
-        restartListening(500);
+    // 音声測定を停止
+    stopMeasurement();
+
+
+    graphArea.style.display =
+      "block";
+
+
+    graphInfo.textContent =
+      "羊の一覧を読み込んでいます…";
+
+
+    loadSheepNames();
+  }
+);
+
+
+
+// ======================================
+// 羊の名前一覧を取得
+// ======================================
+
+function loadSheepNames() {
+
+  jsonpRequest(
+    {
+      action: "names"
+    },
+
+    function(result) {
+
+      if (!result.success) {
+
+        graphInfo.textContent =
+          "一覧取得エラー：" +
+          result.error;
+
+        return;
+      }
+
+
+      sheepSelect.innerHTML =
+        '<option value="">' +
+        '羊を選んでください' +
+        '</option>';
+
+
+      result.names.forEach(
+        function(name) {
+
+          const option =
+            document.createElement(
+              "option"
+            );
+
+
+          option.value =
+            name;
+
+          option.textContent =
+            name;
+
+
+          sheepSelect.appendChild(
+            option
+          );
+        }
+      );
+
+
+      graphInfo.textContent =
+        "";
+    }
+  );
+}
+
+
+
+// ======================================
+// グラフ表示
+// ======================================
+
+showGraphButton.addEventListener(
+  "click",
+  function() {
+
+    const name =
+      sheepSelect.value;
+
+
+    if (!name) {
+
+      graphInfo.textContent =
+        "羊を選んでください";
+
+      return;
+    }
+
+
+    graphInfo.textContent =
+      "体重履歴を読み込んでいます…";
+
+
+    loadWeightHistory(
+      name
+    );
+  }
+);
+
+
+
+// ======================================
+// 体重履歴取得
+// ======================================
+
+function loadWeightHistory(name) {
+
+  jsonpRequest(
+    {
+      action: "history",
+      name: name
+    },
+
+    function(result) {
+
+      if (!result.success) {
+
+        graphInfo.textContent =
+          "履歴取得エラー：" +
+          result.error;
+
+        return;
+      }
+
+
+      drawWeightChart(
+        result
+      );
+    }
+  );
+}
+
+
+
+// ======================================
+// グラフ描画
+// ======================================
+
+function drawWeightChart(result) {
+
+  const history =
+    result.history;
+
+
+  if (
+    !history ||
+    history.length === 0
+  ) {
+
+    graphInfo.textContent =
+      "体重データがありません";
+
+    return;
+  }
+
+
+  const labels =
+    history.map(
+      function(item) {
+
+        return item.date;
+      }
+    );
+
+
+  const weights =
+    history.map(
+      function(item) {
+
+        return item.weight;
+      }
+    );
+
+
+  const latest =
+    weights[
+      weights.length - 1
+    ];
+
+
+  let info =
+    "🐑 " +
+    result.name +
+    "　現在：" +
+    latest +
+    " kg";
+
+
+  if (
+    weights.length >= 2
+  ) {
+
+    const previous =
+      weights[
+        weights.length - 2
+      ];
+
+
+    const diff =
+      Math.round(
+        (
+          latest -
+          previous
+        ) * 10
+      ) / 10;
+
+
+    if (diff > 0) {
+
+      info +=
+        "　前回比：+" +
+        diff +
+        " kg";
+
+    } else {
+
+      info +=
+        "　前回比：" +
+        diff +
+        " kg";
+    }
+  }
+
+
+  graphInfo.textContent =
+    info;
+
+
+  if (weightChart) {
+
+    weightChart.destroy();
+  }
+
+
+  const ctx =
+    document
+      .getElementById(
+        "weightChart"
+      )
+      .getContext("2d");
+
+
+  weightChart =
+    new Chart(
+      ctx,
+      {
+
+        type: "line",
+
+        data: {
+
+          labels: labels,
+
+          datasets: [
+
+            {
+
+              label:
+                result.name +
+                " の体重",
+
+              data:
+                weights,
+
+              borderColor:
+                "#49764b",
+
+              backgroundColor:
+                "#49764b",
+
+              borderWidth:
+                3,
+
+              pointRadius:
+                5,
+
+              pointHoverRadius:
+                7,
+
+              tension:
+                0.2
+            }
+          ]
+        },
+
+
+        options: {
+
+          responsive:
+            true,
+
+          maintainAspectRatio:
+            false,
+
+
+          plugins: {
+
+            legend: {
+
+              display:
+                true
+            }
+          },
+
+
+          scales: {
+
+            y: {
+
+              title: {
+
+                display:
+                  true,
+
+                text:
+                  "体重（kg）"
+              }
+            },
+
+
+            x: {
+
+              title: {
+
+                display:
+                  true,
+
+                text:
+                  "測定日"
+              }
+            }
+          }
+        }
+      }
+    );
+}
+
+
+
+// ======================================
+// グラフを閉じる
+// ======================================
+
+closeGraphButton.addEventListener(
+  "click",
+  function() {
+
+    graphArea.style.display =
+      "none";
+
+    graphInfo.textContent =
+      "";
+
+    status.textContent =
+      "測定を開始してください";
+  }
+);
+
+
+
+// ======================================
+// JSONP共通通信
+// ======================================
+
+function jsonpRequest(
+  params,
+  callback
+) {
+
+  const callbackName =
+    "sheepCallback_" +
+    Date.now() +
+    "_" +
+    Math.floor(
+      Math.random() * 10000
+    );
+
+
+  const script =
+    document.createElement(
+      "script"
+    );
+
+
+  window[callbackName] =
+    function(result) {
+
+      try {
+
+        callback(result);
+
+      } finally {
+
+        delete window[
+          callbackName
+        ];
+
+
+        if (
+          script.parentNode
+        ) {
+
+          script.parentNode
+            .removeChild(
+              script
+            );
+        }
       }
     };
 
 
-    speechSynthesis.speak(
-      utterance
+  const query =
+    Object.keys(params)
+      .map(
+        function(key) {
+
+          return (
+            encodeURIComponent(key) +
+            "=" +
+            encodeURIComponent(
+              params[key]
+            )
+          );
+        }
+      )
+      .join("&");
+
+
+  script.src =
+    API_URL +
+    "?" +
+    query +
+    "&callback=" +
+    encodeURIComponent(
+      callbackName
     );
 
-  }, 300);
+
+  script.onerror =
+    function() {
+
+      delete window[
+        callbackName
+      ];
+
+
+      if (
+        script.parentNode
+      ) {
+
+        script.parentNode
+          .removeChild(
+            script
+          );
+      }
+
+
+      status.textContent =
+        "通信エラーが発生しました";
+    };
+
+
+  document.body.appendChild(
+    script
+  );
 }
 
+
+
+// ======================================
+// HTML安全表示
+// ======================================
 
 function escapeHtml(text) {
 
   const div =
-    document.createElement("div");
+    document.createElement(
+      "div"
+    );
 
-  div.textContent = text;
+  div.textContent =
+    text;
 
   return div.innerHTML;
 }
