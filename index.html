@@ -1114,6 +1114,48 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// ======================================
+// ★ページ起動時にグラフデータを先読み
+// ======================================
+
+function preloadAllHistory() {
+
+  if (allHistoryData) {
+    return;
+  }
+
+  jsonpRequest(
+    {
+      action: "allHistory"
+    },
+
+    function(result) {
+
+      if (result.success) {
+
+        allHistoryData =
+          result.sheep;
+
+        console.log(
+          "体重履歴を先読みしました"
+        );
+      }
+    }
+  );
+}
+
+
+// ページを開いて0.5秒後に
+// 裏で読み込み開始
+setTimeout(
+  function() {
+
+    preloadAllHistory();
+
+  },
+  500
+);
+  
 </script>
 
 </body>
