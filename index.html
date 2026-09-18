@@ -6,7 +6,6 @@
 
 <title>めぐさと羊 体重記録</title>
 
-<!-- グラフ表示用 -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -18,9 +17,7 @@ body {
   color: #333;
 }
 
-h1 {
-  font-size: 26px;
-}
+h1 { font-size: 26px; }
 
 button {
   width: 90%;
@@ -33,26 +30,10 @@ button {
   color: white;
 }
 
-#startButton {
-  background: #49764b;
-}
-
-#stopButton {
-  background: #8b4545;
-}
-
-#graphButton {
-  background: #416b91;
-  margin-top: 25px;
-}
-
-#showGraphButton {
-  background: #49764b;
-}
-
-#closeGraphButton {
-  background: #777;
-}
+#startButton { background: #49764b; }
+#stopButton { background: #8b4545; }
+#graphButton { background: #416b91; margin-top: 25px; }
+#closeGraphButton { background: #777; }
 
 #status {
   font-size: 21px;
@@ -103,7 +84,7 @@ select {
 .chartBox {
   position: relative;
   width: 100%;
-  min-height: 320px;
+  height: 340px;
 }
 </style>
 </head>
@@ -132,7 +113,6 @@ select {
 </button>
 
 
-<!-- グラフ画面 -->
 <div id="graphArea">
 
   <h2>📈 体重推移</h2>
@@ -142,12 +122,6 @@ select {
       羊を選んでください
     </option>
   </select>
-
-  <br>
-
-  <button id="showGraphButton">
-    グラフを表示
-  </button>
 
   <div id="graphInfo"></div>
 
@@ -164,13 +138,9 @@ select {
 
 <script>
 
-// ★★★★★★★★★★★★★★★★★★★★★
-// ここだけ自分のApps Script URLに変更
-// ★★★★★★★★★★★★★★★★★★★★★
-
+// ★ここだけ自分のApps Script URLに変更
 const API_URL =
   "https://script.google.com/macros/s/AKfycbzSuD_O2Pny7pmCAMq2ENK_v_KYv4Wn42sOsqLQNhI6TMoWEkVBggiJW9JBBIiw6AWc/exec";
-
 
 const WAKE_WORD = "羊体重";
 
@@ -204,9 +174,6 @@ const graphArea =
 const sheepSelect =
   document.getElementById("sheepSelect");
 
-const showGraphButton =
-  document.getElementById("showGraphButton");
-
 const closeGraphButton =
   document.getElementById("closeGraphButton");
 
@@ -217,7 +184,12 @@ const graphInfo =
 let recognition;
 let running = false;
 let restarting = false;
+
 let weightChart = null;
+
+
+// ★全羊データをここに保存
+let allHistoryData = null;
 
 
 
@@ -237,14 +209,9 @@ if (!SpeechRecognition) {
   recognition =
     new SpeechRecognition();
 
-  recognition.lang =
-    "ja-JP";
-
-  recognition.continuous =
-    false;
-
-  recognition.interimResults =
-    false;
+  recognition.lang = "ja-JP";
+  recognition.continuous = false;
+  recognition.interimResults = false;
 
 
   recognition.onresult =
@@ -265,16 +232,9 @@ if (!SpeechRecognition) {
   recognition.onerror =
     function(event) {
 
-      console.log(
-        "Speech error:",
-        event.error
-      );
-
-
       if (
         event.error === "not-allowed" ||
-        event.error ===
-          "service-not-allowed"
+        event.error === "service-not-allowed"
       ) {
 
         running = false;
@@ -287,7 +247,6 @@ if (!SpeechRecognition) {
 
 
       if (running) {
-
         restartListening(700);
       }
     };
@@ -296,7 +255,7 @@ if (!SpeechRecognition) {
 
 
 // ======================================
-// 連続測定開始
+// 測定開始
 // ======================================
 
 startButton.addEventListener(
@@ -306,7 +265,6 @@ startButton.addEventListener(
     if (running) return;
 
 
-    // グラフを閉じる
     graphArea.style.display =
       "none";
 
@@ -329,18 +287,16 @@ startButton.addEventListener(
       );
 
 
-    unlock.lang =
-      "ja-JP";
+    unlock.lang = "ja-JP";
 
-    unlock.rate =
-      0.9;
+    // 前に調整した速度
+    unlock.rate = 0.9;
 
 
     unlock.onend =
       function() {
 
         if (running) {
-
           startListening();
         }
       };
@@ -374,9 +330,7 @@ function stopMeasurement() {
   if (recognition) {
 
     try {
-
       recognition.abort();
-
     } catch (e) {}
   }
 
@@ -388,7 +342,7 @@ function stopMeasurement() {
 
 
 // ======================================
-// 聞き取り開始
+// 音声待受
 // ======================================
 
 function startListening() {
@@ -418,7 +372,6 @@ function restartListening(delay) {
     !running ||
     restarting
   ) {
-
     return;
   }
 
@@ -429,12 +382,10 @@ function restartListening(delay) {
   setTimeout(
     function() {
 
-      restarting =
-        false;
+      restarting = false;
 
 
       if (running) {
-
         startListening();
       }
 
@@ -446,7 +397,7 @@ function restartListening(delay) {
 
 
 // ======================================
-// 認識内容を処理
+// 音声解析
 // ======================================
 
 function processSpeech(text) {
@@ -458,7 +409,7 @@ function processSpeech(text) {
     normalizeText(text);
 
 
-  // 「羊体重」で始まらなければ無視
+  // 羊体重から始まらなければ無視
   if (
     !normalized.startsWith(
       WAKE_WORD
@@ -476,9 +427,7 @@ function processSpeech(text) {
 
   normalized =
     normalized
-      .slice(
-        WAKE_WORD.length
-      )
+      .slice(WAKE_WORD.length)
       .replace(
         /^[、,\s]+/,
         ""
@@ -527,7 +476,7 @@ function processSpeech(text) {
 
 
 // ======================================
-// 文字の整理
+// 数字変換
 // ======================================
 
 function normalizeText(text) {
@@ -584,6 +533,11 @@ function registerWeight(
       }
 
 
+      // ★新しい測定が入ったので
+      // グラフデータを次回再取得
+      allHistoryData = null;
+
+
       status.textContent =
         "✅ 登録しました";
 
@@ -595,7 +549,7 @@ function registerWeight(
 
 
 // ======================================
-// 登録結果を読み上げ
+// 登録結果読み上げ
 // ======================================
 
 function speakResult(result) {
@@ -682,14 +636,13 @@ function speakResult(result) {
 
 
 // ======================================
-// グラフボタン
+// グラフを開く
 // ======================================
 
 graphButton.addEventListener(
   "click",
   function() {
 
-    // 音声測定を停止
     stopMeasurement();
 
 
@@ -697,25 +650,34 @@ graphButton.addEventListener(
       "block";
 
 
+    // すでに取得済みなら通信しない
+    if (allHistoryData) {
+
+      setupSheepSelect();
+
+      return;
+    }
+
+
     graphInfo.textContent =
-      "羊の一覧を読み込んでいます…";
+      "体重データを読み込んでいます…";
 
 
-    loadSheepNames();
+    loadAllHistory();
   }
 );
 
 
 
 // ======================================
-// 羊の名前一覧を取得
+// ★全羊データを1回だけ取得
 // ======================================
 
-function loadSheepNames() {
+function loadAllHistory() {
 
   jsonpRequest(
     {
-      action: "names"
+      action: "allHistory"
     },
 
     function(result) {
@@ -723,44 +685,19 @@ function loadSheepNames() {
       if (!result.success) {
 
         graphInfo.textContent =
-          "一覧取得エラー：" +
+          "データ取得エラー：" +
           result.error;
 
         return;
       }
 
 
-      sheepSelect.innerHTML =
-        '<option value="">' +
-        '羊を選んでください' +
-        '</option>';
+      // iPhone内に保持
+      allHistoryData =
+        result.sheep;
 
 
-      result.names.forEach(
-        function(name) {
-
-          const option =
-            document.createElement(
-              "option"
-            );
-
-
-          option.value =
-            name;
-
-          option.textContent =
-            name;
-
-
-          sheepSelect.appendChild(
-            option
-          );
-        }
-      );
-
-
-      graphInfo.textContent =
-        "";
+      setupSheepSelect();
     }
   );
 }
@@ -768,11 +705,58 @@ function loadSheepNames() {
 
 
 // ======================================
-// グラフ表示
+// 羊選択メニュー
 // ======================================
 
-showGraphButton.addEventListener(
-  "click",
+function setupSheepSelect() {
+
+  const names =
+    Object.keys(
+      allHistoryData || {}
+    ).sort();
+
+
+  sheepSelect.innerHTML =
+    '<option value="">' +
+    '羊を選んでください' +
+    '</option>';
+
+
+  names.forEach(
+    function(name) {
+
+      const option =
+        document.createElement(
+          "option"
+        );
+
+
+      option.value =
+        name;
+
+      option.textContent =
+        name;
+
+
+      sheepSelect.appendChild(
+        option
+      );
+    }
+  );
+
+
+  graphInfo.textContent =
+    "羊を選んでください";
+}
+
+
+
+// ======================================
+// ★選ぶだけで即グラフ表示
+// ======================================
+
+sheepSelect.addEventListener(
+  "change",
   function() {
 
     const name =
@@ -788,12 +772,9 @@ showGraphButton.addEventListener(
     }
 
 
-    graphInfo.textContent =
-      "体重履歴を読み込んでいます…";
-
-
-    loadWeightHistory(
-      name
+    drawWeightChart(
+      name,
+      allHistoryData[name]
     );
   }
 );
@@ -801,47 +782,13 @@ showGraphButton.addEventListener(
 
 
 // ======================================
-// 体重履歴取得
-// ======================================
-
-function loadWeightHistory(name) {
-
-  jsonpRequest(
-    {
-      action: "history",
-      name: name
-    },
-
-    function(result) {
-
-      if (!result.success) {
-
-        graphInfo.textContent =
-          "履歴取得エラー：" +
-          result.error;
-
-        return;
-      }
-
-
-      drawWeightChart(
-        result
-      );
-    }
-  );
-}
-
-
-
-// ======================================
 // グラフ描画
 // ======================================
 
-function drawWeightChart(result) {
-
-  const history =
-    result.history;
-
+function drawWeightChart(
+  name,
+  history
+) {
 
   if (
     !history ||
@@ -858,7 +805,6 @@ function drawWeightChart(result) {
   const labels =
     history.map(
       function(item) {
-
         return item.date;
       }
     );
@@ -867,7 +813,6 @@ function drawWeightChart(result) {
   const weights =
     history.map(
       function(item) {
-
         return item.weight;
       }
     );
@@ -881,7 +826,7 @@ function drawWeightChart(result) {
 
   let info =
     "🐑 " +
-    result.name +
+    name +
     "　現在：" +
     latest +
     " kg";
@@ -928,7 +873,6 @@ function drawWeightChart(result) {
 
 
   if (weightChart) {
-
     weightChart.destroy();
   }
 
@@ -957,7 +901,7 @@ function drawWeightChart(result) {
             {
 
               label:
-                result.name +
+                name +
                 " の体重",
 
               data:
@@ -997,9 +941,7 @@ function drawWeightChart(result) {
           plugins: {
 
             legend: {
-
-              display:
-                true
+              display: true
             }
           },
 
@@ -1049,8 +991,6 @@ closeGraphButton.addEventListener(
     graphArea.style.display =
       "none";
 
-    graphInfo.textContent =
-      "";
 
     status.textContent =
       "測定を開始してください";
@@ -1060,7 +1000,7 @@ closeGraphButton.addEventListener(
 
 
 // ======================================
-// JSONP共通通信
+// JSONP通信
 // ======================================
 
 function jsonpRequest(
@@ -1145,18 +1085,7 @@ function jsonpRequest(
       ];
 
 
-      if (
-        script.parentNode
-      ) {
-
-        script.parentNode
-          .removeChild(
-            script
-          );
-      }
-
-
-      status.textContent =
+      graphInfo.textContent =
         "通信エラーが発生しました";
     };
 
