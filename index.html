@@ -1,63 +1,58 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>めぐさと羊 体重記録</title>
+<title>めぐさと羊 体重記録</title>
 
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      padding: 35px 20px;
-      background: #f5f5ef;
-      color: #333;
-    }
+<style>
+body {
+  font-family: sans-serif;
+  text-align: center;
+  padding: 30px 20px;
+  background: #f5f5ef;
+  color: #333;
+}
 
-    h1 {
-      font-size: 26px;
-    }
+h1 { font-size: 26px; }
 
-    button {
-      width: 90%;
-      max-width: 400px;
-      padding: 22px;
-      margin: 25px 0;
-      font-size: 24px;
-      border: none;
-      border-radius: 14px;
-      background: #49764b;
-      color: white;
-    }
+button {
+  width: 90%;
+  max-width: 400px;
+  padding: 20px;
+  margin: 10px;
+  font-size: 22px;
+  border: none;
+  border-radius: 14px;
+  color: white;
+}
 
-    #status {
-      font-size: 21px;
-      margin: 20px;
-      font-weight: bold;
-    }
+#startButton { background: #49764b; }
+#stopButton { background: #8b4545; }
 
-    #heard {
-      font-size: 18px;
-      color: #666;
-      margin: 20px 0;
-    }
+#status {
+  font-size: 22px;
+  font-weight: bold;
+  margin: 25px 0;
+}
 
-    #parsed {
-      max-width: 400px;
-      margin: 25px auto;
-      padding: 20px;
-      background: white;
-      border-radius: 14px;
-      font-size: 23px;
-      line-height: 1.8;
-    }
+#heard {
+  font-size: 17px;
+  color: #666;
+  margin: 15px;
+}
 
-    .error {
-      color: #b00020;
-    }
-  </style>
+#parsed {
+  max-width: 400px;
+  margin: 20px auto;
+  padding: 20px;
+  background: white;
+  border-radius: 14px;
+  font-size: 22px;
+  line-height: 1.7;
+}
+</style>
 </head>
 
 <body>
@@ -65,27 +60,27 @@
 <h1>🐑 めぐさと羊 体重記録</h1>
 
 <button id="startButton">
-  🎤 音声入力
+▶️ 連続測定を開始
 </button>
 
-<button id="soundTestButton">
-  🔊 音声テスト
+<button id="stopButton">
+⏹ 測定を終了
 </button>
-  
+
 <div id="status">
-  ボタンを押してください
+測定を開始してください
 </div>
 
 <div id="heard"></div>
 <div id="parsed"></div>
 
-
 <script>
 
-// ★ここだけ自分のURLに変更
+// ★ここを自分のApps Script URLに変更
 const API_URL =
   "https://script.google.com/macros/s/AKfycbzSuD_O2Pny7pmCAMq2ENK_v_KYv4Wn42sOsqLQNhI6TMoWEkVBggiJW9JBBIiw6AWc/exec";
 
+const WAKE_WORD = "めぐさと";
 
 const SpeechRecognition =
   window.SpeechRecognition ||
@@ -100,31 +95,15 @@ const heard =
 const parsed =
   document.getElementById("parsed");
 
-const button =
+const startButton =
   document.getElementById("startButton");
 
-const soundTestButton =
-  document.getElementById("soundTestButton");
-
-soundTestButton.addEventListener("click", function() {
-
-  speechSynthesis.cancel();
-
-  const utterance =
-    new SpeechSynthesisUtterance(
-      "音声テストです"
-    );
-
-  utterance.lang = "ja-JP";
-  utterance.volume = 1;
-  utterance.rate = 1;
-
-  speechSynthesis.speak(utterance);
-
-});
-
+const stopButton =
+  document.getElementById("stopButton");
 
 let recognition;
+let running = false;
+let restarting = false;
 
 
 if (!SpeechRecognition) {
@@ -132,7 +111,7 @@ if (!SpeechRecognition) {
   status.textContent =
     "このブラウザでは音声認識を利用できません";
 
-  button.disabled = true;
+  startButton.disabled = true;
 
 } else {
 
@@ -144,87 +123,181 @@ if (!SpeechRecognition) {
   recognition.interimResults = false;
 
 
-button.addEventListener("click", function() {
-
-  heard.textContent = "";
-  parsed.textContent = "";
-
-  status.textContent =
-    "音声入力を開始します…";
-
-  // iPhone Safariで読み上げ機能を有効化
-  speechSynthesis.cancel();
-
-  const unlock =
-    new SpeechSynthesisUtterance(
-      "開始します"
-    );
-
-  unlock.lang = "ja-JP";
-  unlock.volume = 1;
-  unlock.rate = 0.9;
-
-  unlock.onend = function() {
-
-    status.textContent =
-      "音声認識を開始しています…";
-
-    recognition.start();
-
-  };
-
-  speechSynthesis.speak(unlock);
-
-});
-
-  recognition.onstart = function() {
-
-    status.textContent =
-      "🎤 聞いています…";
-
-  };
-
-
+  // 認識結果
   recognition.onresult = function(event) {
 
     const text =
-      event.results[0][0].transcript;
+      event.results[0][0].transcript.trim();
 
     heard.textContent =
       "認識：" + text;
 
-    parseWeight(text);
-
+    processSpeech(text);
   };
 
 
   recognition.onerror = function(event) {
 
-    status.textContent =
-      "エラー：" + event.error;
+    console.log(
+      "Speech error:",
+      event.error
+    );
 
+    if (
+      event.error === "not-allowed" ||
+      event.error === "service-not-allowed"
+    ) {
+
+      running = false;
+
+      status.textContent =
+        "マイクを利用できません";
+
+      return;
+    }
+
+    if (running) {
+      restartListening(700);
+    }
+  };
+
+
+  recognition.onend = function() {
+
+    // processSpeech側で登録処理中の場合は
+    // そこで再開するので何もしない
   };
 }
 
 
-// 音声を名前＋体重に分ける
-function parseWeight(text) {
+// 連続測定開始
+startButton.addEventListener(
+  "click",
+  function() {
 
-  let normalized = text
-    .replace(/０/g, "0")
-    .replace(/１/g, "1")
-    .replace(/２/g, "2")
-    .replace(/３/g, "3")
-    .replace(/４/g, "4")
-    .replace(/５/g, "5")
-    .replace(/６/g, "6")
-    .replace(/７/g, "7")
-    .replace(/８/g, "8")
-    .replace(/９/g, "9")
-    .replace(/．/g, ".")
-    .replace(/点/g, ".");
+    if (running) return;
+
+    running = true;
+
+    heard.textContent = "";
+    parsed.textContent = "";
+
+    status.textContent =
+      "開始します…";
+
+    // iPhone Safariの音声を有効化
+    speechSynthesis.cancel();
+
+    const unlock =
+      new SpeechSynthesisUtterance(
+        "開始します"
+      );
+
+    unlock.lang = "ja-JP";
+    unlock.rate = 0.9;
+
+    unlock.onend = function() {
+
+      if (running) {
+        startListening();
+      }
+    };
+
+    speechSynthesis.speak(unlock);
+  }
+);
 
 
+// 測定終了
+stopButton.addEventListener(
+  "click",
+  function() {
+
+    running = false;
+
+    speechSynthesis.cancel();
+
+    try {
+      recognition.abort();
+    } catch (e) {}
+
+    status.textContent =
+      "測定を終了しました";
+
+    heard.textContent = "";
+  }
+);
+
+
+// 聞き取り開始
+function startListening() {
+
+  if (!running) return;
+
+  status.textContent =
+    "🎤 「めぐさと」と呼びかけてください";
+
+  try {
+
+    recognition.start();
+
+  } catch (e) {
+
+    restartListening(700);
+
+  }
+}
+
+
+// 少し待って再開
+function restartListening(delay) {
+
+  if (!running || restarting) return;
+
+  restarting = true;
+
+  setTimeout(function() {
+
+    restarting = false;
+
+    if (running) {
+      startListening();
+    }
+
+  }, delay);
+}
+
+
+// 認識内容を処理
+function processSpeech(text) {
+
+  if (!running) return;
+
+
+  let normalized =
+    normalizeText(text);
+
+
+  // 「めぐさと」で始まらなければ無視
+  if (!normalized.startsWith(WAKE_WORD)) {
+
+    status.textContent =
+      "待機中…";
+
+    restartListening(500);
+
+    return;
+  }
+
+
+  // 最初の「めぐさと」を削除
+  normalized =
+    normalized
+      .slice(WAKE_WORD.length)
+      .replace(/^[、,\s]+/, "");
+
+
+  // 名前＋体重を取得
   const match =
     normalized.match(
       /^(.+?)[、,\s]*(\d+(?:\.\d+)?)\s*(?:キロ|kg|キログラム)/i
@@ -234,12 +307,9 @@ function parseWeight(text) {
   if (!match) {
 
     status.textContent =
-      "うまく読み取れませんでした";
+      "名前と体重を読み取れませんでした";
 
-    parsed.innerHTML =
-      '<span class="error">' +
-      '「名前、47.5キロ」のように話してください' +
-      '</span>';
+    restartListening(700);
 
     return;
   }
@@ -261,16 +331,35 @@ function parseWeight(text) {
     " kg</strong>";
 
 
-  // Google Sheetへ送信
   registerWeight(name, weight);
 }
 
 
-// Apps Scriptへ送る
+// 数字などを整える
+function normalizeText(text) {
+
+  return text
+    .replace(/０/g, "0")
+    .replace(/１/g, "1")
+    .replace(/２/g, "2")
+    .replace(/３/g, "3")
+    .replace(/４/g, "4")
+    .replace(/５/g, "5")
+    .replace(/６/g, "6")
+    .replace(/７/g, "7")
+    .replace(/８/g, "8")
+    .replace(/９/g, "9")
+    .replace(/．/g, ".")
+    .replace(/点/g, ".")
+    .trim();
+}
+
+
+// Google Sheetへ登録
 function registerWeight(name, weight) {
 
   status.textContent =
-    "Google Sheetへ登録しています…";
+    "登録しています…";
 
 
   const callbackName =
@@ -280,26 +369,28 @@ function registerWeight(name, weight) {
   window[callbackName] =
     function(result) {
 
-      if (result.success) {
-
-        status.textContent =
-          "✅ 登録しました";
-
-        speakResult(result);
-
-      } else {
-
-        status.textContent =
-          "登録エラー：" + result.error;
-
-      }
-
-
       delete window[callbackName];
 
       if (script.parentNode) {
         script.parentNode.removeChild(script);
       }
+
+
+      if (!result.success) {
+
+        status.textContent =
+          "登録エラー：" + result.error;
+
+        restartListening(1000);
+
+        return;
+      }
+
+
+      status.textContent =
+        "✅ 登録しました";
+
+      speakResult(result);
     };
 
 
@@ -326,6 +417,7 @@ function registerWeight(name, weight) {
 
       delete window[callbackName];
 
+      restartListening(1000);
     };
 
 
@@ -333,7 +425,7 @@ function registerWeight(name, weight) {
 }
 
 
-// 登録結果を読み上げる
+// 登録結果を復唱
 function speakResult(result) {
 
   let message =
@@ -370,41 +462,53 @@ function speakResult(result) {
 
       message +=
         "前回と同じです。";
-
     }
   }
 
 
-  // 残っている読み上げを一度リセット
   speechSynthesis.cancel();
 
 
-  // 少し待ってから読み上げる
   setTimeout(function() {
 
     const utterance =
-      new SpeechSynthesisUtterance(message);
+      new SpeechSynthesisUtterance(
+        message
+      );
 
     utterance.lang = "ja-JP";
-    utterance.volume = 1;
     utterance.rate = 1;
 
-    speechSynthesis.speak(utterance);
+
+    // 復唱が終わったら次の羊へ
+    utterance.onend = function() {
+
+      if (running) {
+
+        status.textContent =
+          "次の羊を待っています…";
+
+        restartListening(500);
+      }
+    };
+
+
+    speechSynthesis.speak(
+      utterance
+    );
 
   }, 300);
-
 }
+
 
 function escapeHtml(text) {
 
   const div =
     document.createElement("div");
 
-  div.textContent =
-    text;
+  div.textContent = text;
 
   return div.innerHTML;
-
 }
 
 </script>
