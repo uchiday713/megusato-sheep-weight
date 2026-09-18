@@ -144,18 +144,38 @@ if (!SpeechRecognition) {
   recognition.interimResults = false;
 
 
-  button.addEventListener("click", function() {
+button.addEventListener("click", function() {
 
-    heard.textContent = "";
-    parsed.textContent = "";
+  heard.textContent = "";
+  parsed.textContent = "";
+
+  status.textContent =
+    "音声入力を開始します…";
+
+  // iPhone Safariで読み上げ機能を有効化
+  speechSynthesis.cancel();
+
+  const unlock =
+    new SpeechSynthesisUtterance(
+      "開始します"
+    );
+
+  unlock.lang = "ja-JP";
+  unlock.volume = 1;
+  unlock.rate = 1.2;
+
+  unlock.onend = function() {
 
     status.textContent =
       "音声認識を開始しています…";
 
     recognition.start();
 
-  });
+  };
 
+  speechSynthesis.speak(unlock);
+
+});
 
   recognition.onstart = function() {
 
