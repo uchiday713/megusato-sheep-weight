@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+
+  <title>羊 音声認識テスト</title>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 40px 20px;
+      background: #f5f5ef;
+    }
+
+    h1 {
+      font-size: 26px;
+    }
+
+    button {
+      width: 90%;
+      max-width: 400px;
+      padding: 22px;
+      margin: 30px 0;
+      font-size: 24px;
+      border: none;
+      border-radius: 14px;
+      background: #49764b;
+      color: white;
+    }
+
+    #status {
+      font-size: 20px;
+      margin: 20px;
+    }
+
+    #result {
+      font-size: 26px;
+      font-weight: bold;
+      margin: 30px 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>🐑 羊 音声認識テスト</h1>
+
+  <button id="startButton">
+    🎤 音声認識を開始
+  </button>
+
+  <div id="status">
+    ボタンを押してください
+  </div>
+
+  <div id="result"></div>
+
+
+<script>
+
+const SpeechRecognition =
+  window.SpeechRecognition ||
+  window.webkitSpeechRecognition;
+
+const status =
+  document.getElementById("status");
+
+const result =
+  document.getElementById("result");
+
+const button =
+  document.getElementById("startButton");
+
+
+if (!SpeechRecognition) {
+
+  status.textContent =
+    "このブラウザでは音声認識を利用できません";
+
+  button.disabled = true;
+
+} else {
+
+  const recognition =
+    new SpeechRecognition();
+
+  recognition.lang = "ja-JP";
+
+  // まずは1回だけ認識する
+  recognition.continuous = false;
+
+  recognition.interimResults = false;
+
+
+  button.addEventListener(
+    "click",
+    function() {
+
+      result.textContent = "";
+
+      status.textContent =
+        "音声認識を開始しています…";
+
+      recognition.start();
+
+    }
+  );
+
+
+  recognition.onstart =
+    function() {
+
+      status.textContent =
+        "🎤 聞いています…";
+
+    };
+
+
+  recognition.onresult =
+    function(event) {
+
+      const text =
+        event.results[0][0].transcript;
+
+      result.textContent =
+        "認識結果：" + text;
+
+      status.textContent =
+        "認識できました！";
+
+    };
+
+
+  recognition.onerror =
+    function(event) {
+
+      status.textContent =
+        "エラー：" + event.error;
+
+    };
+
+
+  recognition.onend =
+    function() {
+
+      if (
+        !result.textContent &&
+        !status.textContent.startsWith("エラー")
+      ) {
+
+        status.textContent =
+          "音声認識が終了しました";
+
+      }
+
+    };
+
+}
+
+</script>
+
+</body>
+</html>
